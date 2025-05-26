@@ -1,4 +1,5 @@
 import databases
+from typing import List
 
 from sqlalchemy import create_engine, Column, Integer, String, BigInteger
 from sqlalchemy.ext.declarative import declarative_base
