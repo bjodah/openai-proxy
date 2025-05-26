@@ -67,6 +67,7 @@ class OverrideStreamResponse(StreamingResponse):
     """
 
     async def stream_response(self, send: Send) -> None:
+        print(f"stream_response, {send=}")
         first_chunk = True
         async for chunk in self.body_iterator:
             if first_chunk:
@@ -81,6 +82,7 @@ class OverrideStreamResponse(StreamingResponse):
         await send({'type': 'http.response.body', 'body': b'', 'more_body': False})
 
     async def send_request_header(self, send: Send) -> None:
+        print(f"send_request_header, {send=}")
         await send(
             {
                 'type': 'http.response.start',
@@ -90,6 +92,7 @@ class OverrideStreamResponse(StreamingResponse):
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        print(f"__call__, {scope=} {receive=} {send=}")
         async with anyio.create_task_group() as task_group:
             async def wrap(func: typing.Callable[[], typing.Coroutine]) -> None:
                 await func()
