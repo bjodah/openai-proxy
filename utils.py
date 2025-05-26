@@ -114,11 +114,10 @@ class OverrideStreamResponse(StreamingResponse):
                 task_group.start_soon(wrap, partial(self.stream_response, send))
                 await wrap(partial(self.listen_for_disconnect, receive))
 
-        except* Exception as exc_group:
-            # Handle exception groups from task_group
-            for exc in exc_group.exceptions:
-                if isinstance(exc, (asyncio.CancelledError, anyio.get_cancelled_exc_class())):
-                    return  # Graceful shutdown on cancellation
+        except Exception as exc:
+            # Handle exceptions from task_group
+            if isinstance(exc, (asyncio.CancelledError, anyio.get_cancelled_exc_class())):
+                return  # Graceful shutdown on cancellation
             raise  # Re-raise other exceptions
             
         finally:
