@@ -1,6 +1,6 @@
-fastapi==0.74.0
-httpx==0.23.0
-sqlalchemy~=1.4.47
-databases~=0.7.0
-uvicorn==0.15.0
-aiosqlite==0.18.0
+fastapi
+httpx
+sqlalchemy
+databases
+uvicorn
+aiosqlite

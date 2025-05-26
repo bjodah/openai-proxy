@@ -1,0 +1,5 @@
+* Notes
+To test the proxies functionality we may run:
+#+begin_src shell
+  OPENAI_PROXY_UNDERLYING=http://localhost:8686 uvicorn main:app --host 127.0.0.1 --port 8000 &
+#+end_src

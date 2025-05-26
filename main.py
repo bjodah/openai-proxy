@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import json
 import time
 from datetime import datetime
@@ -11,8 +12,8 @@ from log import OpenAILog, save_log
 from utils import PathMatchingTree, OverrideStreamResponse
 
 proxied_hosts = PathMatchingTree({
-    "/": "https://api.openai.com",
-    "/backend-api/conversation": "https://chat.openai.com",
+    "/": os.environ.get("OPENAI_PROXY_UNDERLYING", "https://api.openai.com"),
+    "/backend-api/conversation": os.environ.get("OPENAI_PROXY_BACKEND_API_CONVERSATION", "https://chat.openai.com"),
 })
 
 # FastAPI app
