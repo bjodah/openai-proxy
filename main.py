@@ -27,8 +27,11 @@ async def proxy_openai_api(request: Request):
     url = f'{proxied_hosts.get_matching(request.url.path)}{request.url.path}'
 
     start_time = datetime.now().microsecond
-    # create httpx async client
-    client = httpx.AsyncClient()
+    # create httpx async client with proper timeout and retry configuration
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(30.0, connect=5.0),
+        transport=httpx.AsyncHTTPTransport(retries=2)
+    )
 
     request_body = await request.json() if request.method in {'POST', 'PUT'} else None
 
@@ -58,8 +61,13 @@ async def proxy_openai_api(request: Request):
                 log.response_content = content.decode('utf-8')
                 log.response_header = json.dumps([[k, v] for k, v in res.headers.items()])
 
+        except httpx.ReadTimeout:
+            raise HTTPException(status_code=504, detail="Upstream service timed out")
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=500, detail=f'An error occurred while requesting: {exc}')
+            raise HTTPException(
+                status_code=502,
+                detail=f"Bad gateway error: {str(exc)}"
+            )
 
     async def update_log():
         nonlocal log

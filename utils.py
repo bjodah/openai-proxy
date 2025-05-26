@@ -68,18 +68,28 @@ class OverrideStreamResponse(StreamingResponse):
 
     async def stream_response(self, send: Send) -> None:
         print(f"stream_response, {send=}")
-        first_chunk = True
-        async for chunk in self.body_iterator:
+        try:
+            first_chunk = True
+            async for chunk in self.body_iterator:
+                if first_chunk:
+                    await self.send_request_header(send)
+                    first_chunk = False
+                if not isinstance(chunk, bytes):
+                    chunk = chunk.encode(self.charset)
+                await send({'type': 'http.response.body', 'body': chunk, 'more_body': True})
+
             if first_chunk:
                 await self.send_request_header(send)
-                first_chunk = False
-            if not isinstance(chunk, bytes):
-                chunk = chunk.encode(self.charset)
-            await send({'type': 'http.response.body', 'body': chunk, 'more_body': True})
-
-        if first_chunk:
-            await self.send_request_header(send)
-        await send({'type': 'http.response.body', 'body': b'', 'more_body': False})
+            await send({'type': 'http.response.body', 'body': b'', 'more_body': False})
+            
+        except (asyncio.CancelledError, anyio.get_cancelled_exc_class()):
+            # Handle cancellation during streaming
+            await send({
+                'type': 'http.response.body',
+                'body': b'',
+                'more_body': False
+            })
+            raise
 
     async def send_request_header(self, send: Send) -> None:
         print(f"send_request_header, {send=}")
@@ -93,13 +103,24 @@ class OverrideStreamResponse(StreamingResponse):
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         print(f"__call__, {scope=} {receive=} {send=}")
-        async with anyio.create_task_group() as task_group:
-            async def wrap(func: typing.Callable[[], typing.Coroutine]) -> None:
-                await func()
-                task_group.cancel_scope.cancel()
+        try:
+            async with anyio.create_task_group() as task_group:
+                async def wrap(func: typing.Callable[[], typing.Coroutine]) -> None:
+                    try:
+                        await func()
+                    finally:
+                        task_group.cancel_scope.cancel()
 
-            task_group.start_soon(wrap, partial(self.stream_response, send))
-            await wrap(partial(self.listen_for_disconnect, receive))
+                task_group.start_soon(wrap, partial(self.stream_response, send))
+                await wrap(partial(self.listen_for_disconnect, receive))
 
-        if self.background is not None:
-            await self.background()
+        except* Exception as exc_group:
+            # Handle exception groups from task_group
+            for exc in exc_group.exceptions:
+                if isinstance(exc, (asyncio.CancelledError, anyio.get_cancelled_exc_class())):
+                    return  # Graceful shutdown on cancellation
+            raise  # Re-raise other exceptions
+            
+        finally:
+            if self.background is not None:
+                await self.background()
