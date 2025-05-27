@@ -58,7 +58,7 @@ async def proxy_openai_api(request: Request):
                     content.extend(chunk)
 
                 # Update log with response data
-                log.response_time = time.time() - start_time
+                log.response_time = int((time.time() * 1000) - start_time)
                 log.status_code = res.status_code
                 log.response_content = content.decode('utf-8')
                 log.response_header = json.dumps([[k, v] for k, v in res.headers.items()])

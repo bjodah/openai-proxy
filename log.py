@@ -57,9 +57,17 @@ except Exception as e:
 
 
 async def save_log(log: OpenAILog):
-    async with database.transaction():
-        query = OpenAILog.__table__.insert().values(**log.to_dict())
-        await database.execute(query)
+    # Use SQLAlchemy session for compatibility with LogQuery
+    session = SessionLocal()
+    try:
+        session.add(log)
+        session.commit()
+        print(f"✅ Saved log entry: {log.id} - {log.request_url} - {log.status_code}")
+    except Exception as e:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 class LogQuery:
@@ -70,7 +78,7 @@ class LogQuery:
         """Get all logs with optional limit"""
         session = SessionLocal()
         try:
-            return session.query(OpenAILog).order_by(desc(OpenAILog.request_time)).limit(limit).all()
+            return session.query(OpenAILog).order_by(OpenAILog.request_time.desc()).limit(limit).all()
         finally:
             session.close()
 
