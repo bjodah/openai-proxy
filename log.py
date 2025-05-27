@@ -48,8 +48,9 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Test database connection
 try:
+    from sqlalchemy import text
     with SessionLocal() as session:
-        session.execute("SELECT 1")
+        session.execute(text("SELECT 1"))
     print("✅ Database connection successful")
 except Exception as e:
     print(f"❌ Database connection failed: {e}")
