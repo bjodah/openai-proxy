@@ -33,20 +33,52 @@ async def proxy_openai_api(request: Request):
         transport=httpx.AsyncHTTPTransport(retries=2)
     )
 
-    request_body = await request.json() if request.method in {'POST', 'PUT'} else None
+    request_body_bytes = await request.body()
+    request_body_for_log = None
+    request_body_for_upstream = None
+
+    if request.method in {'POST', 'PUT'}:
+        try:
+            # For logging, decode assuming UTF-8.
+            request_body_for_log = request_body_bytes.decode('utf-8')
+            # For upstream, parse as JSON. If this fails, it's a client error (400).
+            # However, some OpenAI endpoints might expect non-JSON POSTs (e.g. file uploads).
+            # For now, we assume JSON if Content-Type suggests it.
+            content_type = request.headers.get("content-type", "").lower()
+            if "application/json" in content_type:
+                request_body_for_upstream = json.loads(request_body_for_log)
+            else:
+                # If not JSON, pass bytes directly (or handle other types)
+                # For this example, we'll assume it's not common for OpenAI and stick to JSON or None
+                # If you need to support other POST types, this logic needs expansion.
+                request_body_for_upstream = None # Or pass request_body_bytes if upstream expects raw bytes
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        except UnicodeDecodeError:
+            # If body isn't UTF-8, log it as undecodable or hex representation
+            request_body_for_log = f"<undecodable_binary_body_length_{len(request_body_bytes)}>"
+            # And assume it's not JSON for upstream if it couldn't be decoded as text.
+            request_body_for_upstream = None # Or handle as appropriate
 
     # Create and populate log entry early
     log = OpenAILog(
         request_url=url,
         request_method=request.method,
         request_time=start_time,
-        request_content=(await request.body()).decode('utf-8') if request.method == 'POST' else None
+        request_content=request_body_for_log
     )
 
     async def stream_api_response():
-        nonlocal log
+        nonlocal log # Ensures we are updating the log object from the outer scope
         try:
-            st = client.stream(request.method, url, headers=headers, params=request.query_params, json=request_body)
+            st = client.stream(
+                request.method,
+                url,
+                headers=headers,
+                params=request.query_params,
+                json=request_body_for_upstream, # Use parsed JSON body for upstream
+                # If supporting non-JSON POSTs, use `content=request_body_bytes` instead of `json`
+            )
             async with st as res:
                 response.status_code = res.status_code
                 response.init_headers({k: v for k, v in res.headers.items() if
@@ -57,46 +89,55 @@ async def proxy_openai_api(request: Request):
                     yield chunk
                     content.extend(chunk)
 
-                # Update log with response data
+                # Update log with response data for success case
                 log.response_time = int((time.time() * 1000) - start_time)
                 log.status_code = res.status_code
-                log.response_content = content.decode('utf-8')
+                log.response_content = content.decode('utf-8', errors='replace') # Handle potential decode errors
                 log.response_header = json.dumps([[k, v] for k, v in res.headers.items()])
 
         except httpx.ReadTimeout as exc:
             log.status_code = 504
             log.response_content = "Upstream service timed out"
             log.response_time = int((time.time() * 1000) - start_time)
-            try:
-                await save_log(log)
-                print(f"✅ Saved timeout log (504) in {log.response_time}ms")
-            except Exception as e:
-                print(f"❌ Failed to save timeout log: {e}")
+            # Log saving will be handled by the background task
             raise HTTPException(status_code=504, detail="Upstream service timed out")
-        except httpx.RequestError as exc:
+        except httpx.RequestError as exc: # Covers ConnectError, etc.
             log.status_code = 502
             log.response_content = f"Bad gateway error: {str(exc)}"
             log.response_time = int((time.time() * 1000) - start_time)
-            try:
-                await save_log(log)
-                print(f"✅ Saved error log (502) in {log.response_time}ms")
-            except Exception as e:
-                print(f"❌ Failed to save error log: {e}")
+            # Log saving will be handled by the background task
             raise HTTPException(
                 status_code=502,
                 detail=f"Bad gateway error: {str(exc)}"
             )
+        # Other exceptions will propagate and be handled by FastAPI's default error handling,
+        # or by OverrideStreamResponse's __call__ method's exception handling.
+        # The log for these unhandled cases might be incomplete but will be saved by update_log.
 
     async def update_log():
-        nonlocal log
-        # Only save if not already saved (error cases save immediately)
-        if log.status_code is None:
-            log.response_time = int((time.time() * 1000) - start_time)
-            try:
-                await save_log(log)
-                print(f"✅ Saved success log ({log.status_code}) in {log.response_time}ms")
-            except Exception as e:
-                print(f"❌ Failed to save success log: {e}")
+        nonlocal log, start_time # Ensure access to the correct 'log' and 'start_time'
+        try:
+            # If response_time or status_code wasn't set due to an unexpected error
+            # before normal completion or handled exception in stream_api_response.
+            if log.response_time is None:
+                log.response_time = int((time.time() * 1000) - start_time)
+            
+            # If status_code is still None here, it means an error occurred very early
+            # or in an unhandled way. It will be saved as NULL in the DB if not set.
+            # For example, if client disconnects before stream_api_response really starts.
+            if log.status_code is None:
+                # Potentially set a default error status if none is available
+                # For now, we let it be None, as the DB column is nullable.
+                print(f"⚠️ Log for {log.request_url} has no status_code at save time.")
+
+
+            await save_log(log)
+            # The print from save_log in log.py will indicate DB operation status.
+            # This print confirms the background task ran.
+            print(f"ℹ️ Background task processed log for {log.request_url} (Status: {log.status_code})")
+        except Exception as e:
+            # This catches errors from save_log itself or other issues within update_log
+            print(f"❌ Failed to save log via background task: {e}. Log URL: {log.request_url}, Status: {log.status_code}")
 
     response = OverrideStreamResponse(stream_api_response(), background=BackgroundTask(update_log))
     return response

@@ -62,10 +62,11 @@ async def save_log(log: OpenAILog):
     try:
         session.add(log)
         session.commit()
-        print(f"✅ Saved log entry: {log.id} - {log.request_url} - {log.status_code}")
+        print(f"✅ Saved log entry: ID {log.id} - URL {log.request_url} - Status {log.status_code}")
     except Exception as e:
         session.rollback()
-        raise
+        print(f"❌ Error in save_log (DB operation failed for URL {log.request_url}, Status {log.status_code}): {e}")
+        raise # Re-raise the exception to be caught by the caller (update_log)
     finally:
         session.close()
 
@@ -206,9 +207,9 @@ def main():
 
 if __name__ == '__main__':
     import argparse
-    from typing import List
-    from datetime import datetime
+    # from typing import List # Already imported at top level
+    # from datetime import datetime # Not used directly in main()
     from sqlalchemy import desc, between
-    import json
+    import json # Already imported at top level
     
     main()
