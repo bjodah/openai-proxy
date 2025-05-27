@@ -26,7 +26,7 @@ async def proxy_openai_api(request: Request):
                k not in {'host', 'content-length', 'x-forwarded-for', 'x-real-ip', 'connection'}}
     url = f'{proxied_hosts.get_matching(request.url.path)}{request.url.path}'
 
-    start_time = datetime.now().microsecond
+    start_time = int(time.time() * 1000)  # Current time in milliseconds
     # create httpx async client with proper timeout and retry configuration
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(30.0, connect=5.0),
@@ -66,14 +66,22 @@ async def proxy_openai_api(request: Request):
         except httpx.ReadTimeout as exc:
             log.status_code = 504
             log.response_content = "Upstream service timed out"
-            log.response_time = time.time() - start_time
-            await save_log(log)
+            log.response_time = int((time.time() * 1000) - start_time)
+            try:
+                await save_log(log)
+                print(f"✅ Saved timeout log (504) in {log.response_time}ms")
+            except Exception as e:
+                print(f"❌ Failed to save timeout log: {e}")
             raise HTTPException(status_code=504, detail="Upstream service timed out")
         except httpx.RequestError as exc:
             log.status_code = 502
             log.response_content = f"Bad gateway error: {str(exc)}"
-            log.response_time = time.time() - start_time
-            await save_log(log)
+            log.response_time = int((time.time() * 1000) - start_time)
+            try:
+                await save_log(log)
+                print(f"✅ Saved error log (502) in {log.response_time}ms")
+            except Exception as e:
+                print(f"❌ Failed to save error log: {e}")
             raise HTTPException(
                 status_code=502,
                 detail=f"Bad gateway error: {str(exc)}"
@@ -83,8 +91,12 @@ async def proxy_openai_api(request: Request):
         nonlocal log
         # Only save if not already saved (error cases save immediately)
         if log.status_code is None:
-            log.response_time = datetime.now().microsecond - start_time
-            await save_log(log)
+            log.response_time = int((time.time() * 1000) - start_time)
+            try:
+                await save_log(log)
+                print(f"✅ Saved success log ({log.status_code}) in {log.response_time}ms")
+            except Exception as e:
+                print(f"❌ Failed to save success log: {e}")
 
     response = OverrideStreamResponse(stream_api_response(), background=BackgroundTask(update_log))
     return response

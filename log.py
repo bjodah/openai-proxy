@@ -42,9 +42,17 @@ class OpenAILog(Base):
         }
 
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 Base.metadata.create_all(bind=engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Test database connection
+try:
+    with SessionLocal() as session:
+        session.execute("SELECT 1")
+    print("✅ Database connection successful")
+except Exception as e:
+    print(f"❌ Database connection failed: {e}")
 
 
 async def save_log(log: OpenAILog):
