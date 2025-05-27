@@ -31,14 +31,14 @@ class OpenAILog(Base):
     def to_dict(self):
         return {
             'id': self.id,
-            'request_url': self.request_url,
-            'request_method': self.request_method,
-            'request_time': self.request_time,
-            'response_time': self.response_time,
-            'status_code': self.status_code,
-            'request_content': self.request_content,
-            'response_header': self.response_header,
-            'response_content': self.response_content,
+            'request_url': str(self.request_url) if self.request_url else None,
+            'request_method': str(self.request_method) if self.request_method else None,
+            'request_time': int(self.request_time) if self.request_time else None,
+            'response_time': int(self.response_time) if self.response_time else None,
+            'status_code': int(self.status_code) if self.status_code else None,
+            'request_content': str(self.request_content) if self.request_content else None,
+            'response_header': str(self.response_header) if self.response_header else None,
+            'response_content': str(self.response_content) if self.response_content else None,
         }
 
 
@@ -127,9 +127,12 @@ def print_logs(logs: List[OpenAILog], output_format: str = 'pretty'):
         print('-' * width)
         for log in logs:
             log_data = log.to_dict()
-            print(f"{log_data['id']:<5} | {log_data['request_time']:<20} | {log_data['request_method']:<7} | "
-                  f"{log_data['status_code']:<6} | {log_data['request_url']:<60} | "
-                  f"{log_data['request_content'] or log_data['response_content']:<50}")
+            print(f"{log_data['id'] or '':<5} | "
+                  f"{log_data['request_time'] or '':<20} | "
+                  f"{log_data['request_method'] or '':<7} | "
+                  f"{log_data['status_code'] or '':<6} | "
+                  f"{log_data['request_url'] or '':<60} | "
+                  f"{(log_data['request_content'] or log_data['response_content'] or '')[:50]:<50}")
 
 def main():
     """Command line interface for log inspection"""
