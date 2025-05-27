@@ -19,14 +19,14 @@ class OpenAILog(Base):
     __tablename__ = 'openai_logs'
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    request_url = Column(String)
-    request_method = Column(String)
-    request_time = Column(BigInteger)
-    response_time = Column(BigInteger)
-    status_code = Column(Integer)
-    request_content = Column(String)
-    response_header = Column(String)
-    response_content = Column(String)
+    request_url = Column(String, nullable=False)
+    request_method = Column(String, nullable=False)
+    request_time = Column(BigInteger, nullable=False)
+    response_time = Column(BigInteger, nullable=True)
+    status_code = Column(Integer, nullable=True)
+    request_content = Column(String, nullable=True)
+    response_header = Column(String, nullable=True)
+    response_content = Column(String, nullable=True)
 
     def to_dict(self):
         return {

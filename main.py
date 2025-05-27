@@ -35,7 +35,13 @@ async def proxy_openai_api(request: Request):
 
     request_body = await request.json() if request.method in {'POST', 'PUT'} else None
 
-    log = OpenAILog()
+    # Create and populate log entry early
+    log = OpenAILog(
+        request_url=url,
+        request_method=request.method,
+        request_time=start_time,
+        request_content=(await request.body()).decode('utf-8') if request.method == 'POST' else None
+    )
 
     async def stream_api_response():
         nonlocal log
@@ -51,19 +57,23 @@ async def proxy_openai_api(request: Request):
                     yield chunk
                     content.extend(chunk)
 
-                # gather log data
-                log.request_url = url
-                log.request_method = request.method
-                log.request_time = start_time
+                # Update log with response data
                 log.response_time = time.time() - start_time
                 log.status_code = res.status_code
-                log.request_content = (await request.body()).decode('utf-8') if request.method == 'POST' else None
                 log.response_content = content.decode('utf-8')
                 log.response_header = json.dumps([[k, v] for k, v in res.headers.items()])
 
-        except httpx.ReadTimeout:
+        except httpx.ReadTimeout as exc:
+            log.status_code = 504
+            log.response_content = "Upstream service timed out"
+            log.response_time = time.time() - start_time
+            await save_log(log)
             raise HTTPException(status_code=504, detail="Upstream service timed out")
         except httpx.RequestError as exc:
+            log.status_code = 502
+            log.response_content = f"Bad gateway error: {str(exc)}"
+            log.response_time = time.time() - start_time
+            await save_log(log)
             raise HTTPException(
                 status_code=502,
                 detail=f"Bad gateway error: {str(exc)}"
@@ -71,8 +81,10 @@ async def proxy_openai_api(request: Request):
 
     async def update_log():
         nonlocal log
-        log.response_time = datetime.now().microsecond - start_time
-        await save_log(log)
+        # Only save if not already saved (error cases save immediately)
+        if log.status_code is None:
+            log.response_time = datetime.now().microsecond - start_time
+            await save_log(log)
 
     response = OverrideStreamResponse(stream_api_response(), background=BackgroundTask(update_log))
     return response
