@@ -42,7 +42,7 @@ pip install -r requirements.txt
 2. Run the proxy server:
 
 ```bash
-uvicorn main:app --host 127.0.0.1 --port 8000
+env OPENAI_PROXY_UNDERLYING=http://localhost:8686 uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
 3. Make requests to the proxy server, specifying the OpenAI API endpoint, model, and any other required parameters:
@@ -55,6 +55,11 @@ curl -X POST "http://localhost:8000/v1/completions" \
 ```
 
 Replace `<your_openai_api_key>` with your actual OpenAI API key.
+
+4. Inspect logs
+```console
+$ python log.py -f json -r 1 | jq '.[0].request_content | fromjson'
+```
 
 In summary, OpenAI API Proxy is a flexible and powerful tool designed to help enterprises and institutions better manage
 and monitor their access to the OpenAI API, improving security, control, and performance.

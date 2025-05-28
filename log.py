@@ -1,3 +1,4 @@
+import sys
 import databases
 from typing import List
 
@@ -51,9 +52,9 @@ try:
     from sqlalchemy import text
     with SessionLocal() as session:
         session.execute(text("SELECT 1"))
-    print("✅ Database connection successful")
+    sys.stderr.write("✅ Database connection successful\n")
 except Exception as e:
-    print(f"❌ Database connection failed: {e}")
+    sys.stderr.write(f"❌ Database connection failed: {e}\n")
 
 
 async def save_log(log: OpenAILog):
@@ -62,10 +63,10 @@ async def save_log(log: OpenAILog):
     try:
         session.add(log)
         session.commit()
-        print(f"✅ Saved log entry: ID {log.id} - URL {log.request_url} - Status {log.status_code}")
+        sys.stderr.write(f"✅ Saved log entry: ID {log.id} - URL {log.request_url} - Status {log.status_code}\n")
     except Exception as e:
         session.rollback()
-        print(f"❌ Error in save_log (DB operation failed for URL {log.request_url}, Status {log.status_code}): {e}")
+        sys.stderr.write(f"❌ Error in save_log (DB operation failed for URL {log.request_url}, Status {log.status_code}): {e}\n")
         raise # Re-raise the exception to be caught by the caller (update_log)
     finally:
         session.close()
@@ -73,7 +74,7 @@ async def save_log(log: OpenAILog):
 
 class LogQuery:
     """Helper class for querying logs"""
-    
+
     @staticmethod
     def get_all(limit: int = 100) -> List[OpenAILog]:
         """Get all logs with optional limit"""
@@ -115,7 +116,7 @@ class LogQuery:
 def print_logs(logs: List[OpenAILog], output_format: str = 'pretty'):
     """Print logs in specified format"""
     if not logs:
-        print("No logs found")
+        sys.stderr.write("No logs found\n")
         return
 
     if output_format == 'json':
@@ -143,19 +144,19 @@ def main():
         epilog="""Examples:
   View last 10 logs (default):
     python log.py
-  
+
   View last 50 logs:
     python log.py -r 50
-  
+
   View all 500 errors:
     python log.py -s 500
-  
+
   View logs between timestamps:
     python log.py -ts 1672531200000 -te 1672617600000
-  
+
   Count all logs:
     python log.py -c
-  
+
   JSON output:
     python log.py -r 5 -f json"""
     )
@@ -211,5 +212,5 @@ if __name__ == '__main__':
     # from datetime import datetime # Not used directly in main()
     from sqlalchemy import desc, between
     import json # Already imported at top level
-    
+
     main()
