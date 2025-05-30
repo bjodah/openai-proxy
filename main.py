@@ -15,6 +15,14 @@ proxied_hosts = PathMatchingTree({
     "/": os.environ.get("OPENAI_PROXY_UNDERLYING", "https://api.openai.com"),
     "/backend-api/conversation": os.environ.get("OPENAI_PROXY_BACKEND_API_CONVERSATION", "https://chat.openai.com"),
 })
+if os.environ.get("OPENAI_PROXY_DEBUG", "0") == "1":
+    def _debug_print(arg):
+        sys.stderr.write(arg+'\n')
+else:
+    def _debug_print(arg):
+        pass
+timout_minutes = 23.0
+
 
 # FastAPI app
 app = FastAPI()
@@ -29,7 +37,7 @@ async def proxy_openai_api(request: Request):
     start_time = int(time.time() * 1000)  # Current time in milliseconds
     # create httpx async client with proper timeout and retry configuration
     client = httpx.AsyncClient(
-        timeout=httpx.Timeout(30.0, connect=5.0),
+        timeout=httpx.Timeout(60*timout_minutes, connect=5.0),
         transport=httpx.AsyncHTTPTransport(retries=2)
     )
 
@@ -121,7 +129,7 @@ async def proxy_openai_api(request: Request):
             # before normal completion or handled exception in stream_api_response.
             if log.response_time is None:
                 log.response_time = int((time.time() * 1000) - start_time)
-            
+
             # If status_code is still None here, it means an error occurred very early
             # or in an unhandled way. It will be saved as NULL in the DB if not set.
             # For example, if client disconnects before stream_api_response really starts.

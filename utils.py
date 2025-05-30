@@ -82,7 +82,7 @@ class OverrideStreamResponse(StreamingResponse):
             if first_chunk:
                 await self.send_request_header(send)
             await send({'type': 'http.response.body', 'body': b'', 'more_body': False})
-            
+
         except (asyncio.CancelledError, anyio.get_cancelled_exc_class()):
             # Handle cancellation during streaming
             await send({
@@ -103,7 +103,6 @@ class OverrideStreamResponse(StreamingResponse):
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        print(f"__call__, {scope=} {receive=} {send=}")
         try:
             async with anyio.create_task_group() as task_group:
                 async def wrap(func: typing.Callable[[], typing.Coroutine]) -> None:
@@ -120,7 +119,7 @@ class OverrideStreamResponse(StreamingResponse):
             if isinstance(exc, (asyncio.CancelledError, anyio.get_cancelled_exc_class())):
                 return  # Graceful shutdown on cancellation
             raise  # Re-raise other exceptions
-            
+
         finally:
             if self.background is not None:
                 await self.background()
