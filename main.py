@@ -6,9 +6,10 @@ from datetime import datetime
 
 import httpx
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from starlette.background import BackgroundTask
 
-from log import OpenAILog, save_log
+from log import OpenAILog, save_log, LogQuery
 from utils import PathMatchingTree, OverrideStreamResponse
 
 proxied_hosts = PathMatchingTree({
@@ -40,6 +41,14 @@ async def proxy_openai_api(request: Request):
         timeout=httpx.Timeout(60*timout_minutes, connect=5.0),
         transport=httpx.AsyncHTTPTransport(retries=2)
     )
+
+
+@app.get("/lastlog")
+async def get_last_log():
+    logs = await run_in_threadpool(LogQuery.get_all, 1)
+    if not logs:
+        raise HTTPException(status_code=404, detail="No logs found")
+    return logs[0].to_dict()
 
     request_body_bytes = await request.body()
     request_body_for_log = None
