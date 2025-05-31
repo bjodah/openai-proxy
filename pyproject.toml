@@ -5,4 +5,4 @@ description = ""
 authors = ["fangwentong <fangwentong2012@gmail.com>"]
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["databases>=0.7.0", "httpx", "fastapi", "starlette", "anyio", "sqlalchemy"]
+dependencies = ["databases>=0.7.0", "httpx", "fastapi", "starlette", "anyio", "sqlalchemy", "uvicorn", "aiosqlite"]
