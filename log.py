@@ -1,3 +1,4 @@
+import os
 import sys
 import databases
 from typing import List
@@ -7,7 +8,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # database config
-DATABASE_URL = 'sqlite:///./openai_log.db'
+DATABASE_URL = 'sqlite:///' + os.environ.get("OPENAI_PROXY_SQLITE_DB_PATH", "./openai_log.db")
 database = databases.Database(DATABASE_URL)
 Base = declarative_base()
 

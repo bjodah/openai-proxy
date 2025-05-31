@@ -68,7 +68,6 @@ class OverrideStreamResponse(StreamingResponse):
     """
 
     async def stream_response(self, send: Send) -> None:
-        print(f"stream_response, {send=}")
         try:
             first_chunk = True
             async for chunk in self.body_iterator:
@@ -93,7 +92,6 @@ class OverrideStreamResponse(StreamingResponse):
             raise
 
     async def send_request_header(self, send: Send) -> None:
-        print(f"send_request_header, {send=}")
         await send(
             {
                 'type': 'http.response.start',
