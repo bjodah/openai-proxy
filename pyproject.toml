@@ -1,16 +1,8 @@
-[tool.poetry]
+[project]
 name = "openai-gateway"
 version = "0.1.0"
 description = ""
 authors = ["fangwentong <fangwentong2012@gmail.com>"]
 readme = "README.md"
-packages = [{ include = "openai_gateway" }]
-
-[tool.poetry.dependencies]
-python = "^3.10"
-databases = "^0.7.0"
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires-python = ">=3.10"
+dependencies = ["databases>=0.7.0", "httpx", "fastapi", "starlette", "anyio", "sqlalchemy"]
