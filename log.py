@@ -99,7 +99,7 @@ class LogQuery:
         session = SessionLocal()
         try:
             return session.query(OpenAILog).filter(
-                between(OpenAILog.request_time, start, end)
+                OpenAILog.request_time.between(start, end)
             ).all()
         finally:
             session.close()
